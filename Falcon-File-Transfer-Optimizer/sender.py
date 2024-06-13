@@ -266,7 +266,7 @@ def sample_transfer(params):
     num_workers.value = params[0]
     log.info("Sample Transfer -- Number of workers: {0}".format(params[0]))
     current_cc = np.sum(process_status)
-    log.info("Sample Transfer -- Current cc: {0}".format(current_cc))
+
     for i in range(configurations["thread_limit"]):
         if i < params[0]:
             if (i >= current_cc):
@@ -394,6 +394,36 @@ def report_throughput(start_time):
             t2 = time.time()
             time.sleep(max(0, 1 - (t2-t1)))
 
+def calculate_rtt():
+  try:
+    server_ip = configurations["receiver"]["host"]
+    
+    server_address = (server_ip, 22)   
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    start_time = time.time()
+    sock.settimeout(5)  # Set a 5-second timeout for connection attempt
+    sock.connect(server_address)
+
+    # Send a simple message (e.g., an HTTP GET request)
+    sock.sendall(b"GET / HTTP/1.1\r\nHost: " + server_address[0].encode() + b"\r\n\r\n")
+
+    data = sock.recv(1024)
+
+  except (ConnectionRefusedError, socket.timeout, socket.error) as err:
+    print("Error connecting to server:", err)
+    return None
+
+  finally:
+    # Close the socket
+    sock.close()
+
+  # End measuring time
+  end_time = time.time()
+  # Calculate RTT
+  rtt = end_time - start_time
+  # Format RTT with 3 decimal places
+  formatted_rtt = f"{rtt:.3f}"
+  return formatted_rtt
 
 if __name__ == '__main__':
     pp = pprint.PrettyPrinter(indent=4)
@@ -416,7 +446,7 @@ if __name__ == '__main__':
         configurations["data_dir"] = args["data_dir"]
 
     if args["method"]:
-        valid_methods = ["gradient", "bayes", "brute", "probe", "random", "cg", "lbfgs"]
+        valid_methods = ["gradient", "bayes", "brute", "probe", "random", "cg", "lbfgs", "hill_climb", "binary"]
         if args["method"] not in valid_methods:
         	raise ValueError(f"Invalid method: {args['method']}. Valid options are: {', '.join(valid_methods)}")
         configurations["method"] = args["method"]
@@ -425,6 +455,13 @@ if __name__ == '__main__':
         configurations["fixed_probing"]["thread"] = int(args["thread"])
 
     pp.pprint(configurations)
+
+    rtt = calculate_rtt()
+
+    if rtt:
+        print("RTT:", rtt, "seconds")
+    else:
+        print("Failed to calculate RTT.")
 
     manager = mp.Manager()
     root = configurations["data_dir"]
