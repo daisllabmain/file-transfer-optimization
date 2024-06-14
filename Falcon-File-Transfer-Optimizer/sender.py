@@ -12,6 +12,7 @@ import pprint
 import argparse
 import logging as log
 import multiprocessing as mp
+import csv
 from threading import Thread
 from concurrent.futures import ThreadPoolExecutor
 from config_sender import configurations
@@ -493,13 +494,10 @@ if __name__ == '__main__':
         q.put(i)
 
     workers = [mp.Process(target=worker, args=(i, q)) for i in range(configurations["thread_limit"])]
-    count = 0
+    
     for p in workers:
-        count += 1 
         p.daemon = True
         p.start()
-
-    log.info("Number of workers: @{0}".format(count))
 
     start = time.time()
     reporting_process = mp.Process(target=report_throughput, args=(start,))
@@ -513,6 +511,20 @@ if __name__ == '__main__':
     thrpt = np.round((total*8*1024)/time_since_begining,2)
     log.info("Total: {0} GB, Time: {1} sec, Throughput: {2} Mbps".format(
         total, time_since_begining, thrpt))
+    
+    with open("output_data.csv", "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+
+        # Check if the file is empty (first iteration)
+        if csvfile.tell() == 0:
+            # Write header row if file is empty
+            writer.writerow(["Timestamp", "Method", "Data Tranferred (GB)", "Time (sec)", "Throughput (Mbps)", "Fixed probing [Thread]"])
+
+        # Get current timestamp
+        timestamp = datetime.datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
+        # Write data row
+        writer.writerow([timestamp, configurations["method"], total, time_since_begining, thrpt, configurations["fixed_probing"]["thread"]])
+
 
     reporting_process.terminate()
     for p in workers:
