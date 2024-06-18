@@ -1,6 +1,6 @@
 configurations = {
     "receiver": {
-        "host": "129.114.108.66",
+        "host": "192.5.87.150",
         "port": 8000
     },
     "data_dir": "/home/cc/dataset/first_one/group_1/",

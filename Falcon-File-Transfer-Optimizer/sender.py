@@ -23,6 +23,7 @@ configurations["cpu_count"] = mp.cpu_count()
 configurations["thread_limit"] = min(max(1,configurations["max_cc"]), configurations["cpu_count"])
 
 log_FORMAT = '%(created)f -- %(levelname)s: %(message)s'
+iteration_id = datetime.datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
 log_file = "logs/" + datetime.datetime.now().strftime("%m_%d_%Y_%H_%M_%S") + ".log"
 
 if configurations["loglevel"] == "debug":
@@ -391,6 +392,17 @@ def report_throughput(start_time):
 
             log.info("Throughput @{0}s: Current: {1}Mbps, Average: {2}Mbps, 60Sec_Average: {3}Mbps".format(
                 time_since_begining, curr_thrpt, thrpt, m_avg))
+            
+            with open("output_data_individual.csv", "a", newline="") as csvfile:
+                writer = csv.writer(csvfile)
+
+                # Check if the file is empty (first iteration)
+                if csvfile.tell() == 0:
+                    # Write header row if file is empty
+                    writer.writerow(["ID", "Time Since Begining (s)", "Current Throughput (Mbps)", "Average Throughput (Mbps)", "60Sec_Average Throughput (Mbps)"])
+                
+                writer.writerow([iteration_id, time_since_begining, curr_thrpt, thrpt, m_avg])
+
 
             t2 = time.time()
             time.sleep(max(0, 1 - (t2-t1)))
@@ -472,6 +484,11 @@ if __name__ == '__main__':
     file_count = len(file_names)
     throughput_logs = manager.list()
 
+    if file_count:
+        print("Number of files:", file_count)
+    else:
+        print("Failed to get file count.")
+
     exit_signal = 10 ** 10
     chunk_size = 1 * 1024 * 1024
     num_workers = mp.Value("i", 0)
@@ -512,18 +529,24 @@ if __name__ == '__main__':
     log.info("Total: {0} GB, Time: {1} sec, Throughput: {2} Mbps".format(
         total, time_since_begining, thrpt))
     
+    avg_file_size = (total*1024)/file_count
+    if avg_file_size:
+        print("Average file size:", avg_file_size, "MB")
+    else:
+        print("Failed to calculate average file size.")
+    
     with open("output_data.csv", "a", newline="") as csvfile:
         writer = csv.writer(csvfile)
 
         # Check if the file is empty (first iteration)
         if csvfile.tell() == 0:
             # Write header row if file is empty
-            writer.writerow(["Timestamp", "Method", "Data Tranferred (GB)", "Time (sec)", "Throughput (Mbps)", "Fixed probing [Thread]"])
+            writer.writerow(["Iteration ID", "Method", "Data Tranferred (GB)", "Time (sec)", "Throughput (Mbps)", "Fixed probing [Thread]"])
 
         # Get current timestamp
         timestamp = datetime.datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
         # Write data row
-        writer.writerow([timestamp, configurations["method"], total, time_since_begining, thrpt, configurations["fixed_probing"]["thread"]])
+        writer.writerow([iteration_id, configurations["method"], total, time_since_begining, thrpt, configurations["fixed_probing"]["thread"]])
 
 
     reporting_process.terminate()
