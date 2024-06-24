@@ -292,8 +292,10 @@ def sample_transfer(params):
     thrpt = np.mean(throughput_logs[-2:]) if len(throughput_logs) > 2 else 0
 
     lr, B, K = 0, int(configurations["B"]), float(configurations["K"])
+    # if sc != 0:
+    #     lr = rc/sc if sc>rc else 0
     if sc != 0:
-        lr = rc/sc if sc>rc else 0
+        lr = max(rc/sc, 0)  # Clamp lr to zero if negative
 
     # score = thrpt
     plr_impact = B*lr
@@ -319,9 +321,43 @@ def normal_transfer(params):
     for i in range(num_workers.value):
         process_status[i] = 1
 
+    time.sleep(1)
+    prev_sc, prev_rc = tcp_stats()
+    
     while (np.sum(process_status) > 0) and (file_incomplete.value > 0):
         pass
 
+    curr_sc, curr_rc = tcp_stats()
+    sc, rc = curr_sc - prev_sc, curr_rc - prev_rc
+
+    log.info("Normal Transfer -- TCP Segments >> Send Count: {0}, Retrans Count: {1}".format(sc, rc))
+
+    thrpt = np.mean(throughput_logs[-2:]) if len(throughput_logs) > 2 else 0
+
+    lr, B, K = 0, int(configurations["B"]), float(configurations["K"])
+
+    if sc != 0:
+        lr = rc/sc if sc>rc else 0
+    # if sc != 0:
+    #     lr = max(rc/sc, 0)  # Clamp lr to zero if negative
+
+    plr_impact = B*lr
+    cc_impact_nl = K**num_workers.value
+    score = (thrpt/cc_impact_nl) - (thrpt * plr_impact)
+    #score_value = np.round(score * (-1))
+
+    log.info("Normal Transfer -- Throughput: {0}Mbps, Loss Rate: {1}%, Score: {2}".format(
+        np.round(thrpt), np.round(lr*100, 8), score))
+    
+    with open("output_data_individual_rt_lr.csv", "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+
+        # Check if the file is empty (first iteration)
+        if csvfile.tell() == 0:
+            # Write header row if file is empty
+            writer.writerow(["ID", "Send Count", "Retrans Count", "Throughput", "Loss Rate (%)", "Score"])
+        
+        writer.writerow([iteration_id, sc, rc, thrpt, np.round(lr*100, 10), score])
 
 def run_transfer():
     params = [2]
