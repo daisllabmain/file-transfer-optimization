@@ -256,7 +256,6 @@ def run_centralized():
         prev_sc, prev_rc = curr_sc, curr_rc
         executor.submit(event_sender, sc, rc)
 
-
 def sample_transfer(params):
     global throughput_logs, exit_signal
 
@@ -323,14 +322,14 @@ def normal_transfer(params):
 
     time.sleep(1)
     prev_sc, prev_rc = tcp_stats()
-    
+
     while (np.sum(process_status) > 0) and (file_incomplete.value > 0):
         pass
 
     curr_sc, curr_rc = tcp_stats()
     sc, rc = curr_sc - prev_sc, curr_rc - prev_rc
 
-    log.info("Normal Transfer -- TCP Segments >> Send Count: {0}, Retrans Count: {1}".format(sc, rc))
+    log.info("Normal Transfer -- TCP Segments >> Send Count: {0}, Retrans Count: {1}".format(abs(sc), abs(rc)))
 
     thrpt = np.mean(throughput_logs[-2:]) if len(throughput_logs) > 2 else 0
 
@@ -344,10 +343,10 @@ def normal_transfer(params):
     plr_impact = B*lr
     cc_impact_nl = K**num_workers.value
     score = (thrpt/cc_impact_nl) - (thrpt * plr_impact)
-    #score_value = np.round(score * (-1))
+    score_value = abs(np.round(score, 2))
 
     log.info("Normal Transfer -- Throughput: {0}Mbps, Loss Rate: {1}%, Score: {2}".format(
-        np.round(thrpt), np.round(lr*100, 8), score))
+        np.round(thrpt), np.round(lr*100, 8), score_value))
     
     with open("output_data_individual_rt_lr.csv", "a", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -355,9 +354,11 @@ def normal_transfer(params):
         # Check if the file is empty (first iteration)
         if csvfile.tell() == 0:
             # Write header row if file is empty
-            writer.writerow(["ID", "Send Count", "Retrans Count", "Throughput", "Loss Rate (%)", "Score"])
+            writer.writerow(["Timestamp", "ID", "Send Count", "Retrans Count", "Throughput", "Loss Rate (%)", "Score"])
         
-        writer.writerow([iteration_id, sc, rc, thrpt, np.round(lr*100, 10), score])
+        timestamp = datetime.datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
+
+        writer.writerow([timestamp, iteration_id, sc, rc, thrpt, np.round(lr*100, 10), score_value])
 
 def run_transfer():
     params = [2]
@@ -402,7 +403,11 @@ def report_throughput(start_time):
     previous_total = 0
     previous_time = 0
 
+    prev_sc, prev_rc = tcp_stats()
+
     while file_incomplete.value > 0:
+        time.sleep(1)
+
         t1 = time.time()
         time_since_begining = np.round(t1-start_time, 1)
 
@@ -425,6 +430,18 @@ def report_throughput(start_time):
             previous_time, previous_total = time_since_begining, total_bytes
             throughput_logs.append(curr_thrpt)
             m_avg = np.round(np.mean(throughput_logs[-60:]), 2)
+    
+            curr_sc, curr_rc = tcp_stats()
+            #print(prev_sc, prev_rc, " : ", curr_sc, curr_rc)
+            sc = abs(curr_sc - prev_sc)
+            rc = abs(curr_rc - prev_rc)
+            log.info("RT -- curr_sc, curr_rc: {0}, {1}".format(sc, rc))
+            prev_sc = sc
+            prev_rc = rc
+
+            cpu_per = psutil.cpu_percent()
+            mem_per = psutil.virtual_memory().percent
+            log.info("RT -- CPU Percentage: {0}%, Memory usage: {1}%".format(cpu_per, mem_per))
 
             log.info("Throughput @{0}s: Current: {1}Mbps, Average: {2}Mbps, 60Sec_Average: {3}Mbps".format(
                 time_since_begining, curr_thrpt, thrpt, m_avg))
@@ -435,10 +452,11 @@ def report_throughput(start_time):
                 # Check if the file is empty (first iteration)
                 if csvfile.tell() == 0:
                     # Write header row if file is empty
-                    writer.writerow(["ID", "Time Since Begining (s)", "Current Throughput (Mbps)", "Average Throughput (Mbps)", "60Sec_Average Throughput (Mbps)"])
+                    writer.writerow(["Timestamp", "ID", "Time Since Begining (s)", "Current Throughput (Mbps)", "Average Throughput (Mbps)", "60Sec_Average Throughput (Mbps)", "Sent count", "Retransmission Count", "CPU Usage (%)", "Memory Usage (%)"])
                 
-                writer.writerow([iteration_id, time_since_begining, curr_thrpt, thrpt, m_avg])
+                timestamp = datetime.datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
 
+                writer.writerow([timestamp, iteration_id, time_since_begining, curr_thrpt, thrpt, m_avg, sc, rc, cpu_per, mem_per])
 
             t2 = time.time()
             time.sleep(max(0, 1 - (t2-t1)))
@@ -577,13 +595,12 @@ if __name__ == '__main__':
         # Check if the file is empty (first iteration)
         if csvfile.tell() == 0:
             # Write header row if file is empty
-            writer.writerow(["Iteration ID", "Method", "Data Tranferred (GB)", "Time (sec)", "Throughput (Mbps)", "Fixed probing [Thread]"])
+            writer.writerow(["Timestamp", "Iteration ID", "Method", "Data Tranferred (GB)", "Time (sec)", "Throughput (Mbps)", "Fixed probing [Thread]"])
 
         # Get current timestamp
         timestamp = datetime.datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
         # Write data row
-        writer.writerow([iteration_id, configurations["method"], total, time_since_begining, thrpt, configurations["fixed_probing"]["thread"]])
-
+        writer.writerow([timestamp, iteration_id, configurations["method"], total, time_since_begining, thrpt, configurations["fixed_probing"]["thread"]])
 
     reporting_process.terminate()
     for p in workers:
