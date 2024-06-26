@@ -6,6 +6,7 @@ remoteSenderIP="129.114.109.142"
 remoteSenderKey="C:/Users/mosta/key_storage/chameleon_key.pem"
 activateSEnvCommand="source mak_env/falcon_env/bin/activate"
 stopFirewall="sudo service firewalld stop"
+powerCommand="sudo sh /home/cc/daisllab/file-transfer-optimization/Falcon-File-Transfer-Optimizer/automation/cpu_power.sh"
 
 # Function to run a command on a remote machine using SSH
 run_remote_command() {
@@ -49,7 +50,7 @@ for ((i = 4; i <= 40; i++)); do
 
         # Connect to the remote sender, activate the environment, and run the sender command
         echo "Connecting to the remote sender"
-        senderCommand="bash -c '$activateSEnvCommand && cd /home/cc/daisllab/file-transfer-optimization/Falcon-File-Transfer-Optimizer && $additionalCommandS2 && $stopFirewall'"
+        senderCommand="bash -c '$activateSEnvCommand && cd /home/cc/daisllab/file-transfer-optimization/Falcon-File-Transfer-Optimizer && $additionalCommandS2 && $stopFirewall && $powerCommand'"
         run_remote_command "$remoteSenderUser" "$remoteSenderIP" "$remoteSenderKey" "$senderCommand"
         
         # Optional delay between nested iterations

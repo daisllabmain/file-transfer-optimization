@@ -11,6 +11,10 @@ get_energy() {
     cat $RAPL_PATH
 }
 
+# Open the CSV file in append mode (>>)
+csv_file="/home/cc/daisllab/file-transfer-optimization/Falcon-File-Transfer-Optimizer/automation/power_data.csv"
+#echo "Timestamp,Power (W)" >> "$csv_file"  # Add header row
+
 # Initial energy value
 initial_energy=$(get_energy)
 
@@ -28,7 +32,9 @@ while true; do
     power=$(echo "$energy_diff / ($INTERVAL * 1000000)" | bc -l)
 
     # Log the power consumption with timestamp
-    echo "$(date) : $power W"
+    #echo "$(date) : $power W"
+    # Log the power consumption with timestamp to the CSV file
+    echo "$(date),$power" >> "$csv_file"
 
     # Update the initial energy value
     initial_energy=$new_energy

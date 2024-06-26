@@ -3,7 +3,7 @@ configurations = {
         "host": "192.5.87.150",
         "port": 8000
     },
-    "data_dir": "/home/cc/dataset/first_one/group_2/",
+    "data_dir": "/home/cc/dataset/first_one/group_1/",
     "method": None, # options: [gradient, bayes, random, brute, probe, cg, lbfgs]
     "bayes": {
         "initial_run": 3,
